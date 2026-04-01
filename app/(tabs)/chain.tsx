@@ -15,7 +15,7 @@ import { fetchChain } from '../../src/lib/api';
 import { formatPrice, formatIV, formatPCRatio } from '../../src/lib/format';
 import { ChainTable } from '../../src/components/ChainTable';
 import { LoadingView, ErrorView } from '../../src/components/LoadingView';
-import type { ChainResponse } from '../../src/lib/types';
+import type { ChainResponse, ChainOption } from '../../src/lib/types';
 
 type Symbol = 'SPY' | 'SPX' | 'QQQ' | 'IWM';
 const SYMBOLS: Symbol[] = ['SPY', 'SPX', 'QQQ', 'IWM'];
@@ -63,7 +63,8 @@ export default function ChainScreen() {
     );
   }
 
-  const filteredOptions = selectedExp
+  // Filter raw options by selected expiration — pass to ChainTable for grouping
+  const filteredOptions: ChainOption[] = selectedExp
     ? (chainData?.options ?? []).filter((o) => o.expiration === selectedExp)
     : (chainData?.options ?? []);
 
@@ -106,7 +107,7 @@ export default function ChainScreen() {
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>IV30</Text>
               <Text style={[styles.summaryValue, { color: colors.amber }]}>
-                {formatIV(chainData.iv30)}
+                {formatIV(chainData.iv30 / 100)}
               </Text>
             </View>
           )}

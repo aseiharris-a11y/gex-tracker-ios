@@ -12,7 +12,7 @@ import * as Haptics from 'expo-haptics';
 
 import { colors, fonts, spacing, radius } from '../../src/lib/theme';
 import { fetchSqueeze } from '../../src/lib/api';
-import { formatPrice, formatGex } from '../../src/lib/format';
+import { formatPrice } from '../../src/lib/format';
 import { RegimeBadge } from '../../src/components/RegimeBadge';
 import { SqueezeCard } from '../../src/components/SqueezeCard';
 import { LoadingView, ErrorView } from '../../src/components/LoadingView';
@@ -55,8 +55,16 @@ export default function ScannerScreen() {
     );
   }
 
-  const regime = data?.regime ?? 'Positive';
-  const regimeStrength = data?.regimeStrength ?? 0;
+  // Capitalize the lowercase regime string from the API
+  const rawRegime = data?.regime ?? 'positive';
+  const regime = (rawRegime.charAt(0).toUpperCase() + rawRegime.slice(1)) as 'Positive' | 'Negative';
+
+  // Compute regime strength as a 0–100 value from distance between spot and gammaFlip
+  const spot = data?.spot ?? 0;
+  const gammaFlip = data?.gammaFlip ?? 0;
+  const regimeStrength = gammaFlip > 0
+    ? Math.min(100, Math.round(Math.abs((spot - gammaFlip) / gammaFlip) * 1000))
+    : 50;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -128,8 +136,8 @@ export default function ScannerScreen() {
             {data.setups.length} setup{data.setups.length !== 1 ? 's' : ''} found
           </Text>
           <Text style={styles.updatedText}>
-            {data.lastUpdated
-              ? new Date(data.lastUpdated).toLocaleTimeString()
+            {data.scanTime
+              ? new Date(data.scanTime).toLocaleTimeString()
               : ''}
           </Text>
         </View>

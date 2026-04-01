@@ -9,16 +9,77 @@ interface SqueezeCardProps {
   setup: SqueezeSetup;
 }
 
-const CONDITION_CONFIG = {
-  Extreme: { bg: colors.red + '22', border: colors.red, text: colors.red },
-  High: { bg: colors.amber + '22', border: colors.amber, text: colors.amber },
-  Moderate: { bg: colors.primary + '22', border: colors.primary, text: colors.primary },
-  Low: { bg: colors.green + '22', border: colors.green, text: colors.green },
+// Map condition codes to display labels and styles
+const CONDITION_CONFIG: Record<
+  SqueezeSetup['condition'],
+  { bg: string; border: string; text: string; label: string }
+> = {
+  loaded_spring: {
+    bg: colors.amber + '22',
+    border: colors.amber,
+    text: colors.amber,
+    label: 'Loaded Spring',
+  },
+  at_trigger: {
+    bg: colors.red + '22',
+    border: colors.red,
+    text: colors.red,
+    label: 'At Trigger',
+  },
+  post_break: {
+    bg: colors.primary + '22',
+    border: colors.primary,
+    text: colors.primary,
+    label: 'Post Break',
+  },
+  no_setup: {
+    bg: colors.border + '22',
+    border: colors.border,
+    text: colors.textDim,
+    label: 'No Setup',
+  },
 };
+
+// Format dealerAction for display
+function formatDealerAction(action: string): string {
+  return action
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
 
 export function SqueezeCard({ setup }: SqueezeCardProps) {
   const [expanded, setExpanded] = useState(false);
-  const condCfg = CONDITION_CONFIG[setup.condition];
+  const condCfg = CONDITION_CONFIG[setup.condition] ?? CONDITION_CONFIG.no_setup;
+
+  // Derive regime from spotBelow
+  const regimeLabel = setup.spotBelow ? '▼ Negative' : '▲ Positive';
+
+  // Build signals inline from real fields
+  const signals = [
+    {
+      name: 'P/C Flow',
+      active: setup.pcRatio > 1.0,
+      description: `P/C: ${setup.pcRatio.toFixed(2)}`,
+    },
+    {
+      name: 'GEX Above',
+      active: setup.gexAboveCeiling < 0,
+      description: formatGex(setup.gexAboveCeiling),
+    },
+    {
+      name: 'Regime',
+      active: setup.spotBelow,
+      description: setup.spotBelow ? 'Below Flip' : 'Above Flip',
+    },
+  ];
+
+  // Top strikes: sort allStrikes by |net_gex| descending, take top 5
+  const topStrikes = [...(setup.allStrikes ?? [])]
+    .sort((a, b) => Math.abs(b.net_gex) - Math.abs(a.net_gex))
+    .slice(0, 5);
+
+  const maxStrikeGex = Math.abs(topStrikes[0]?.net_gex ?? 1) || 1;
 
   return (
     <Pressable
@@ -28,7 +89,7 @@ export function SqueezeCard({ setup }: SqueezeCardProps) {
       {/* Header row */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <ScoreGauge score={setup.score} size={60} />
+          <ScoreGauge score={setup.squeezeScore} size={60} />
         </View>
         <View style={styles.headerCenter}>
           <Text style={styles.expiration}>{formatDateShort(setup.expiration)}</Text>
@@ -42,23 +103,34 @@ export function SqueezeCard({ setup }: SqueezeCardProps) {
             ]}
           >
             <Text style={[styles.conditionText, { color: condCfg.text }]}>
-              {setup.condition}
+              {condCfg.label}
             </Text>
           </View>
         </View>
         <View style={styles.headerRight}>
-          <Text style={styles.regimeLabel}>
-            {setup.regime === 'Positive' ? '▲' : '▼'} {setup.regime}
-          </Text>
-          <Text style={styles.dealerAction}>{setup.dealerAction}</Text>
+          <Text style={styles.regimeLabel}>{regimeLabel}</Text>
+          <Text style={styles.dealerAction}>{formatDealerAction(setup.dealerAction)}</Text>
         </View>
       </View>
 
       {/* Key levels row */}
       <View style={styles.levelsRow}>
         <View style={styles.levelItem}>
-          <Text style={styles.levelLabel}>Key Level</Text>
-          <Text style={styles.levelValue}>{formatPrice(setup.keyLevel)}</Text>
+          <Text style={styles.levelLabel}>Neg γ Ceiling</Text>
+          <Text style={styles.levelValue}>
+            {setup.negGammaCeiling?.strike != null
+              ? formatPrice(setup.negGammaCeiling.strike)
+              : '—'}
+          </Text>
+        </View>
+        <View style={styles.levelDivider} />
+        <View style={styles.levelItem}>
+          <Text style={styles.levelLabel}>Call Wall</Text>
+          <Text style={[styles.levelValue, { color: colors.green }]}>
+            {setup.callWall?.strike != null
+              ? formatPrice(setup.callWall.strike)
+              : '—'}
+          </Text>
         </View>
         <View style={styles.levelDivider} />
         <View style={styles.levelItem}>
@@ -73,7 +145,7 @@ export function SqueezeCard({ setup }: SqueezeCardProps) {
       {expanded && (
         <View style={styles.expandedSection}>
           <Text style={styles.expandedTitle}>Signals</Text>
-          {setup.signals.map((sig, i) => (
+          {signals.map((sig, i) => (
             <View key={i} style={styles.signalRow}>
               <View
                 style={[
@@ -88,30 +160,30 @@ export function SqueezeCard({ setup }: SqueezeCardProps) {
             </View>
           ))}
 
-          {setup.topStrikes.length > 0 && (
+          {topStrikes.length > 0 && (
             <>
               <Text style={[styles.expandedTitle, { marginTop: spacing.md }]}>
                 Top Strikes
               </Text>
-              {setup.topStrikes.slice(0, 5).map((ts, i) => (
+              {topStrikes.map((ts, i) => (
                 <View key={i} style={styles.strikeRow}>
                   <Text style={styles.strikePrice}>{formatPrice(ts.strike)}</Text>
                   <View
                     style={[
                       styles.strikeGexBar,
                       {
-                        backgroundColor: ts.gex >= 0 ? colors.greenDim : colors.redDim,
-                        width: Math.min(Math.abs(ts.gex) * 80 + 20, 120),
+                        backgroundColor: ts.net_gex >= 0 ? colors.greenDim : colors.redDim,
+                        width: Math.min((Math.abs(ts.net_gex) / maxStrikeGex) * 80 + 20, 120),
                       },
                     ]}
                   />
                   <Text
                     style={[
                       styles.strikeGexLabel,
-                      { color: ts.gex >= 0 ? colors.green : colors.red },
+                      { color: ts.net_gex >= 0 ? colors.green : colors.red },
                     ]}
                   >
-                    {formatGex(ts.gex)}
+                    {formatGex(ts.net_gex)}
                   </Text>
                 </View>
               ))}

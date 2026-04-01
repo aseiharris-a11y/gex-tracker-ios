@@ -1,12 +1,20 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { colors, fonts, spacing } from '../lib/theme';
-import { formatOI, formatStrike, formatIV } from '../lib/format';
-import type { OptionRow } from '../lib/types';
+import { formatOI, formatIV } from '../lib/format';
+import type { ChainOption } from '../lib/types';
 
 interface ChainTableProps {
-  options: OptionRow[];
+  options: ChainOption[];
   spot: number;
+}
+
+/** A merged call+put row for display, keyed by strike */
+interface StrikeRow {
+  strike: number;
+  expiration: string;
+  call?: ChainOption;
+  put?: ChainOption;
 }
 
 const COL_W = {
@@ -14,10 +22,17 @@ const COL_W = {
   oi: 60,
   volume: 56,
   iv: 52,
-  gamma: 60,
 };
 
-function HeaderCell({ label, width, align = 'right' }: { label: string; width: number; align?: 'left' | 'center' | 'right' }) {
+function HeaderCell({
+  label,
+  width,
+  align = 'right',
+}: {
+  label: string;
+  width: number;
+  align?: 'left' | 'center' | 'right';
+}) {
   return (
     <Text style={[styles.headerCell, { width, textAlign: align }]}>{label}</Text>
   );
@@ -46,9 +61,27 @@ function DataCell({
   );
 }
 
+/** Group a flat array of ChainOption into per-strike rows */
+function groupByStrike(options: ChainOption[]): StrikeRow[] {
+  const map = new Map<number, StrikeRow>();
+
+  for (const opt of options) {
+    if (!map.has(opt.strike)) {
+      map.set(opt.strike, { strike: opt.strike, expiration: opt.expiration });
+    }
+    const row = map.get(opt.strike)!;
+    if (opt.type === 'C') {
+      row.call = opt;
+    } else {
+      row.put = opt;
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.strike - a.strike);
+}
+
 export function ChainTable({ options, spot }: ChainTableProps) {
-  // Sort by strike
-  const sorted = [...options].sort((a, b) => b.strike - a.strike);
+  const rows = groupByStrike(options);
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator>
@@ -69,18 +102,26 @@ export function ChainTable({ options, spot }: ChainTableProps) {
 
         {/* Data rows */}
         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
-          {sorted.map((row) => {
-            const isATM = row.isATM ?? Math.abs(row.strike - spot) < spot * 0.003;
+          {rows.map((row) => {
+            const isATM = Math.abs(row.strike - spot) < spot * 0.003;
             return (
               <View
                 key={`${row.strike}-${row.expiration}`}
                 style={[styles.dataRow, isATM && styles.atmRow]}
               >
                 {/* Call side — green tint */}
-                <DataCell value={formatOI(row.callOI)} width={COL_W.oi} color={colors.green} />
-                <DataCell value={formatOI(row.callVolume)} width={COL_W.volume} color={colors.green} />
                 <DataCell
-                  value={row.callIV != null ? formatIV(row.callIV) : '—'}
+                  value={row.call != null ? formatOI(row.call.openInterest) : '—'}
+                  width={COL_W.oi}
+                  color={colors.green}
+                />
+                <DataCell
+                  value={row.call != null ? formatOI(row.call.volume) : '—'}
+                  width={COL_W.volume}
+                  color={colors.green}
+                />
+                <DataCell
+                  value={row.call?.iv != null ? formatIV(row.call.iv) : '—'}
                   width={COL_W.iv}
                   color={colors.green}
                 />
@@ -98,12 +139,20 @@ export function ChainTable({ options, spot }: ChainTableProps) {
                 </Text>
                 {/* Put side — red tint */}
                 <DataCell
-                  value={row.putIV != null ? formatIV(row.putIV) : '—'}
+                  value={row.put?.iv != null ? formatIV(row.put.iv) : '—'}
                   width={COL_W.iv}
                   color={colors.red}
                 />
-                <DataCell value={formatOI(row.putVolume)} width={COL_W.volume} color={colors.red} />
-                <DataCell value={formatOI(row.putOI)} width={COL_W.oi} color={colors.red} />
+                <DataCell
+                  value={row.put != null ? formatOI(row.put.volume) : '—'}
+                  width={COL_W.volume}
+                  color={colors.red}
+                />
+                <DataCell
+                  value={row.put != null ? formatOI(row.put.openInterest) : '—'}
+                  width={COL_W.oi}
+                  color={colors.red}
+                />
               </View>
             );
           })}

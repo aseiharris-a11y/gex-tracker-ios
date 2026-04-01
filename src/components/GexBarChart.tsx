@@ -2,11 +2,11 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import Svg, { Rect, Line, Text as SvgText, G } from 'react-native-svg';
 import { colors, fonts, spacing, radius } from '../lib/theme';
-import { formatGex, formatStrike } from '../lib/format';
-import type { StrikeGex } from '../lib/types';
+import { formatGex } from '../lib/format';
+import type { GexStrike } from '../lib/types';
 
 interface GexBarChartProps {
-  strikes: StrikeGex[];
+  strikes: GexStrike[];
   spot: number;
   height?: number;
 }
@@ -26,7 +26,7 @@ export function GexBarChart({ strikes, spot, height = 220 }: GexBarChartProps) {
   }, [strikes, spot]);
 
   const maxAbs = useMemo(() => {
-    const max = Math.max(...filtered.map((s) => Math.abs(s.netGex)));
+    const max = Math.max(...filtered.map((s) => Math.abs(s.net_gex)));
     return max === 0 ? 1 : max;
   }, [filtered]);
 
@@ -48,10 +48,10 @@ export function GexBarChart({ strikes, spot, height = 220 }: GexBarChartProps) {
 
   const bars = filtered.map((s, i) => {
     const x = PADDING.left + 16 + i * (BAR_WIDTH + barGap);
-    const normalized = s.netGex / maxAbs;
+    const normalized = s.net_gex / maxAbs;
     const barHeight = Math.abs(normalized) * (plotH / 2) * 0.9;
-    const y = s.netGex >= 0 ? midY - barHeight : midY;
-    const fill = s.netGex >= 0 ? colors.green : colors.red;
+    const y = s.net_gex >= 0 ? midY - barHeight : midY;
+    const fill = s.net_gex >= 0 ? colors.green : colors.red;
     const isATM = Math.abs(s.strike - spot) < spot * 0.003;
 
     return { ...s, x, y, barHeight, fill, isATM };

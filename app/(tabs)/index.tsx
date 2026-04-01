@@ -77,10 +77,16 @@ export default function DashboardScreen() {
     );
   }
 
-  const spot = gexData?.spot ?? 0;
-  const gammaFlip = gexData?.gammaFlip ?? 0;
-  const netGex = gexData?.netGex ?? 0;
-  const regime = gexData?.regime ?? 'Positive';
+  // Map real API response fields
+  const spot = gexData?.underlying_price ?? 0;
+  const gammaFlip = gexData?.gamma_flip ?? 0;
+  const netGex = gexData?.net_gex ?? 0;
+  const netGexLabel = gexData?.net_gex_label ?? formatGex(netGex);
+  const regime = spot > gammaFlip ? 'Positive' : 'Negative';
+
+  // Compute call/put GEX totals from strikes array
+  const callGex = (gexData?.strikes ?? []).reduce((sum, s) => sum + (s.call_gex ?? 0), 0);
+  const putGex = (gexData?.strikes ?? []).reduce((sum, s) => sum + (s.put_gex ?? 0), 0);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -89,8 +95,8 @@ export default function DashboardScreen() {
         <View>
           <Text style={styles.appName}>GEX Tracker</Text>
           <Text style={styles.lastUpdated}>
-            {gexData?.lastUpdated
-              ? new Date(gexData.lastUpdated).toLocaleTimeString()
+            {gexData?.as_of
+              ? new Date(gexData.as_of).toLocaleTimeString()
               : 'Live'}
           </Text>
         </View>
@@ -162,28 +168,28 @@ export default function DashboardScreen() {
           <View style={[styles.kpiRow, { marginTop: spacing.sm }]}>
             <KpiCard
               label="Net GEX"
-              value={formatGex(netGex)}
+              value={netGexLabel}
               accent={netGex >= 0 ? 'green' : 'red'}
             />
             <View style={styles.kpiGap} />
             <KpiCard
               label="Regime"
               value={regime}
-              subtext={`Call: ${formatGex(gexData?.callGex ?? 0)}`}
+              subtext={`Call: ${formatGex(callGex)}`}
               accent={regime === 'Positive' ? 'green' : 'red'}
             />
           </View>
         </View>
 
         {/* Key Levels */}
-        {levelsData && levelsData.levels.length > 0 && (
+        {levelsData && (
           <View style={styles.section}>
-            <KeyLevels levels={levelsData.levels} spot={spot} />
+            <KeyLevels levels={levelsData} spot={spot} />
           </View>
         )}
 
         {/* GEX Bar Chart */}
-        {gexData && gexData.strikes.length > 0 && (
+        {gexData && (gexData.strikes?.length ?? 0) > 0 && (
           <View style={styles.section}>
             <GexBarChart strikes={gexData.strikes} spot={spot} />
           </View>
@@ -194,14 +200,14 @@ export default function DashboardScreen() {
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Call GEX</Text>
             <Text style={[styles.summaryValue, { color: colors.green }]}>
-              {formatGex(gexData?.callGex ?? 0)}
+              {formatGex(callGex)}
             </Text>
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Put GEX</Text>
             <Text style={[styles.summaryValue, { color: colors.red }]}>
-              {formatGex(gexData?.putGex ?? 0)}
+              {formatGex(putGex)}
             </Text>
           </View>
           <View style={styles.summaryDivider} />

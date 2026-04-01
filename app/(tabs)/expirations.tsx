@@ -107,6 +107,18 @@ export default function ExpirationsScreen() {
     );
   }
 
+  // Derived values from ExpirationDetail
+  const detailNetGex = detail?.gexData?.net_gex ?? 0;
+  const detailGammaFlip = detail?.levelsData?.gamma_flip ?? 0;
+  const detailStrikes = detail?.gexData?.strikes ?? [];
+  // Top strikes sorted by |net_gex| descending
+  const topStrikes = [...detailStrikes]
+    .sort((a, b) => Math.abs(b.net_gex) - Math.abs(a.net_gex))
+    .slice(0, 10);
+  // Compute call/put GEX totals from strikes
+  const detailCallGex = detailStrikes.reduce((sum, s) => sum + (s.call_gex ?? 0), 0);
+  const detailPutGex = detailStrikes.reduce((sum, s) => sum + (s.put_gex ?? 0), 0);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       {/* Header */}
@@ -201,62 +213,65 @@ export default function ExpirationsScreen() {
                   <Text
                     style={[
                       styles.kpiValue,
-                      { color: detail.netGex >= 0 ? colors.green : colors.red },
+                      { color: detailNetGex >= 0 ? colors.green : colors.red },
                     ]}
                   >
-                    {formatGex(detail.netGex)}
+                    {formatGex(detailNetGex)}
                   </Text>
                 </View>
                 <View style={styles.kpiItem}>
                   <Text style={styles.kpiLabel}>Call GEX</Text>
                   <Text style={[styles.kpiValue, { color: colors.green }]}>
-                    {formatGex(detail.callGex)}
+                    {formatGex(detailCallGex)}
                   </Text>
                 </View>
                 <View style={styles.kpiItem}>
                   <Text style={styles.kpiLabel}>Put GEX</Text>
                   <Text style={[styles.kpiValue, { color: colors.red }]}>
-                    {formatGex(detail.putGex)}
+                    {formatGex(detailPutGex)}
                   </Text>
                 </View>
                 <View style={styles.kpiItem}>
                   <Text style={styles.kpiLabel}>Gamma Flip</Text>
                   <Text style={[styles.kpiValue, { color: colors.primary }]}>
-                    ${detail.gammaFlip.toFixed(0)}
+                    ${detailGammaFlip.toFixed(0)}
                   </Text>
                 </View>
               </View>
 
               {/* Mini GEX chart */}
-              {detail.strikes.length > 0 && (
+              {detailStrikes.length > 0 && (
                 <View style={styles.chartSection}>
-                  <GexBarChart strikes={detail.strikes} spot={detail.spot} height={180} />
+                  <GexBarChart strikes={detailStrikes} spot={detail.spot} height={180} />
                 </View>
               )}
 
               {/* Top strikes table */}
-              {detail.topStrikes.length > 0 && (
+              {topStrikes.length > 0 && (
                 <View style={styles.topStrikesSection}>
                   <Text style={styles.topStrikesTitle}>Top Strikes</Text>
-                  {detail.topStrikes.slice(0, 10).map((s, i) => (
+                  {topStrikes.map((s, i) => (
                     <View key={i} style={styles.strikeRow}>
                       <Text style={styles.strikePriceText}>${s.strike.toFixed(0)}</Text>
                       <View
                         style={[
                           styles.strikeBar,
                           {
-                            backgroundColor: s.netGex >= 0 ? colors.greenDim : colors.redDim,
-                            flex: Math.min(Math.abs(s.netGex) / (detail.topStrikes[0]?.netGex ?? 1), 1),
+                            backgroundColor: s.net_gex >= 0 ? colors.greenDim : colors.redDim,
+                            flex: Math.min(
+                              Math.abs(s.net_gex) / (Math.abs(topStrikes[0]?.net_gex ?? 1) || 1),
+                              1,
+                            ),
                           },
                         ]}
                       />
                       <Text
                         style={[
                           styles.strikeGexText,
-                          { color: s.netGex >= 0 ? colors.green : colors.red },
+                          { color: s.net_gex >= 0 ? colors.green : colors.red },
                         ]}
                       >
-                        {formatGex(s.netGex)}
+                        {formatGex(s.net_gex)}
                       </Text>
                     </View>
                   ))}
